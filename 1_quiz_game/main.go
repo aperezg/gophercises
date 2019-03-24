@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 )
 
 // Quiz define format of quiz with questions and answers
@@ -18,6 +19,7 @@ type Quiz struct {
 
 func main() {
 	filePath := flag.String("csv", "problem.csv", "a csv file in the format of 'question,answer' (default 'problem.csv')")
+	limit := flag.Int("limit", 30, "the time limit for quiz in seconds (default 30)")
 	flag.Usage = func() {
 		flag.PrintDefaults()
 	}
@@ -28,27 +30,36 @@ func main() {
 		log.Fatal(err)
 	}
 
-	play(q)
+	fmt.Println("Press enter to start the quiz...")
+	fmt.Scanln()
+	play(q, *limit)
 }
 
-func play(quiz []Quiz) {
-	problemN := 1
-	scann := bufio.NewScanner(os.Stdin)
-	score := 0
-
-	for _, q := range quiz {
-		fmt.Printf("Problem #%d: %s = ", problemN, q.Question)
-		scann.Scan()
-		answer := scann.Text()
-
-		if answer == q.Answer {
-			score++
+func play(quiz []Quiz, limit int) {
+	var score int
+	quit := make(chan bool)
+	go func() {
+		for i, q := range quiz {
+			fmt.Printf("Problem #%d: %s =\n", i+1, q.Question)
+			var answer string
+			fmt.Scanf("%s\n", &answer)
+			if answer == q.Answer {
+				score++
+			}
 		}
-
-		problemN++
+		quit <- true
+	}()
+	select {
+	case <-quit:
+		printTotal(score, len(quiz))
+	case <-time.After(time.Duration(limit) * time.Second):
+		printTotal(score, len(quiz))
 	}
 
-	fmt.Printf("You scored %d of %d.\n", score, len(quiz))
+}
+
+func printTotal(score, total int) {
+	fmt.Printf("You scored %d of %d.\n", score, total)
 }
 
 func readFile(path string) ([]Quiz, error) {
